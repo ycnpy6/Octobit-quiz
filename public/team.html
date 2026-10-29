@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Octobit Quiz team</title>
+<meta name="description" content="Buzzer and answer pad for one team in the Octobit CS quiz.">
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/common.css">
+<style>
+/* Hallmark · shape: app screen · genre: playful · theme: Arcade (deal 1/3, seed quiz-buzzer-game-octobit-e5c8·9a339a3a·2026-10-28·r0) · redesign: full
+ * nav: kept (host header, board scoreline, team header) · signature: Octo, the Octobit pixel octopus, in each team's ink · states: lobby, live, locked, steal, reveal, paused, finished, reconnecting · arcade: ember/grille
+ * axes: dark/pixel/chromatic-ember · posture: full-palette · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: H, the host console stays a dense tool; it takes the system, not the stage */
+  html { overflow-x: clip; }
+  body { display: flex; flex-direction: column; height: 100vh; height: 100dvh; padding: var(--space-md); gap: var(--space-sm); overflow: clip; }
+  header { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-xs) var(--space-sm); border: var(--rule-bar) solid var(--me); border-radius: var(--radius-card); background: var(--color-paper-2); }
+  header .mascot { flex: none; width: clamp(40px, 6vh, 60px); color: var(--me); }
+  .who { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+  .who small { font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); }
+  .name { font-size: clamp(22px, 3.5vw, 34px); font-weight: 900; letter-spacing: -0.02em; line-height: 1.05; color: var(--me); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scores { display: flex; align-items: baseline; gap: var(--space-md); white-space: nowrap; }
+  .scores .mine { font-size: clamp(40px, 6vw, 60px); color: var(--me); }
+  .scores .theirs { font-size: var(--text-md); font-weight: 700; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+  .status { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: 120px; padding: var(--space-sm) var(--space-md); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); }
+  .status .msg { font-variant-numeric: tabular-nums; font-size: clamp(22px, 3.2vw, 34px); font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+  .status.go { background: var(--me); border-color: var(--me); color: var(--color-accent-ink); }
+  .status.go .ring { background: var(--color-paper); }
+  .status.alert { border-color: var(--bad); color: var(--bad); }
+  .meta { font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); margin-bottom: var(--space-2xs); }
+  .question { font-size: clamp(18px, min(3.2vw, 4.4vh), 38px); font-weight: 900; letter-spacing: -0.01em; line-height: 1.2; text-wrap: balance; }
+  .code { font-size: max(11px, min(1.9vw, 2.4vh, calc(30vh / (var(--lines, 1) * 1.45)))); }
+  body.has-code .status { min-height: 0; padding-block: var(--space-xs); }
+  body.has-code .ring { width: 64px; height: 64px; padding-bottom: var(--space-xs); }
+  body.has-code .ring span { font-size: 28px; }
+  body.has-code .ring::after { height: 5px; bottom: 4px; }
+  body.has-code .option { padding-block: 1vh; font-size: clamp(13px, min(2vw, 2.6vh), 22px); }
+  body.has-code #buzz { height: 13vh; min-height: 64px; }
+  .options { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-3xs) var(--space-xs) var(--space-xs) var(--space-3xs); }
+  .option { font-size: clamp(14px, min(2.3vw, 3.1vh), 26px); padding: 1.6vh var(--space-md); }
+  #buzz { flex: none; height: 19vh; min-height: 84px; border: 3px solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); color: var(--color-muted); font-family: var(--font-display); font-size: clamp(40px, 8vw, 84px); line-height: 1; text-transform: uppercase;
+    transition: translate var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
+  #buzz.live { background: var(--me); border-color: var(--color-ink); color: var(--color-accent-ink); box-shadow: 8px 8px 0 var(--color-ink); animation: coin 1s steps(1) infinite; }
+  #buzz.live:hover { translate: -1px -1px; }
+  #buzz.live:active { translate: 6px 6px; box-shadow: 2px 2px 0 var(--color-ink); animation: none; }
+  #buzz:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+  #buzz:disabled { cursor: default; }
+  @keyframes coin { 50% { box-shadow: 4px 4px 0 var(--color-ink); translate: 2px 2px; } }
+  @media (prefers-reduced-motion: reduce) { #buzz.live { animation: none; } #buzz { transition: none; } }
+  @media (max-width: 560px) { .options { grid-template-columns: minmax(0, 1fr); } body { padding: var(--space-xs); gap: var(--space-xs); } .who small { display: none; } header { flex-wrap: wrap; } .who { flex-basis: 50%; } .scores { gap: var(--space-xs); } .status { min-height: 84px; } }
+</style>
+</head>
+<body>
+  <header>
+    <div class="mascot" id="mascot"></div>
+    <div class="who"><small id="slot">Team</small><div class="name" id="name">Team</div></div>
+    <div class="scores"><span class="mine figure" id="myScore">0</span><span class="theirs" id="theirScore"></span></div>
+  </header>
+  <div class="status crt" id="status">
+    <div class="msg" id="msg">Connecting…</div>
+    <div class="ring hidden" id="ring" role="timer"><span></span></div>
+  </div>
+  <section id="qbox" class="hidden">
+    <div class="meta" id="meta"></div>
+    <div class="question" id="question"></div>
+    <pre class="code hidden" id="code"></pre>
+  </section>
+  <div class="options hidden" id="options"></div>
+  <button id="buzz" disabled>BUZZ</button>
+  <div class="toast" id="toast"></div>
+  <script src="/common.js"></script>
+  <script src="/team.js"></script>
+</body>
+</html>

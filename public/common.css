@@ -1,0 +1,105 @@
+/* Hallmark · shape: app screen · genre: playful · theme: Arcade (deal 1/3, seed quiz-buzzer-game-octobit-e5c8·9a339a3a·2026-10-28·r0) · redesign: full
+ * nav: kept (host header, board scoreline, team header) · signature: Octo, the Octobit pixel octopus, in each team's ink · states: lobby, live, locked, steal, reveal, paused, finished, reconnecting · arcade: ember/grille
+ * axes: dark/pixel/chromatic-ember · posture: full-palette · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: H, the host console stays a dense tool; it takes the system, not the stage */
+/* Hallmark · waive 80 · the sprite is the Octobit club symbol the user asked for · Arcade forbids drawn pixel characters, but the user's own words beat the theme */
+/* Hallmark · waive 26b · board.html and host.html inline styles add no controls of their own · the press, hover, focus and disabled states live in common.css */
+@import url("./tokens.css");
+@import url("./base.css");
+
+@font-face { font-family: "Bungee"; src: url("/fonts/bungee.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Chivo"; src: url("/fonts/chivo.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Silkscreen"; src: url("/fonts/silkscreen-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+/* Ember is player A, acid answers as player B; both carry dark ink on a fill. */
+:root {
+  --team-A: var(--color-accent);
+  --team-B: var(--color-accent-2);
+  --ok: var(--color-success);
+  --bad: var(--color-error);
+  --shadow-press: 4px 4px 0 var(--color-accent-2);
+  --color-octo: oklch(64% 0.23 303); /* Octo is always club purple */
+  --font-code: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+html, body { height: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+button { color: inherit; cursor: pointer; touch-action: manipulation; user-select: none; }
+button:disabled { cursor: default; }
+.hidden { display: none !important; }
+.muted { color: var(--color-muted); }
+.display { font-family: var(--font-display); font-weight: 400; line-height: 1.02; text-transform: uppercase; text-shadow: -1.5px 0 0 var(--color-crt-r), 1.5px 0 0 var(--color-crt-c); }
+.figure { font-family: var(--font-outlier); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+
+/* The press surface: hover lifts away from the shadow, active slams into it. */
+.btn { background: transparent; color: var(--color-ink); border: var(--rule-bar) solid var(--color-ink); border-radius: var(--radius-card); padding: var(--space-xs) var(--space-md); font-weight: 700; line-height: 1.3; box-shadow: var(--shadow-press);
+  transition: translate var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
+.btn:hover:not(:disabled) { translate: -1px -1px; box-shadow: 5px 5px 0 var(--color-accent-2); }
+.btn:active:not(:disabled) { translate: 3px 3px; box-shadow: 1px 1px 0 var(--color-accent-2); }
+.btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; transition: none; }
+.btn.primary { background: var(--color-accent); color: var(--color-accent-ink); }
+.btn.ok { background: var(--ok); color: var(--color-accent-ink); }
+.btn.bad { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn:disabled { background: var(--color-paper-2); color: var(--color-muted); border-color: var(--color-rule); box-shadow: none; cursor: not-allowed; opacity: .6; }
+
+/* Answer options: wells with a key cap. Live ones light like a menu cursor. */
+.options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.option { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; text-align: left; padding: var(--space-sm) var(--space-md); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); color: var(--color-ink); font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.option .letter { flex: none; display: grid; place-items: center; width: 1.9em; height: 1.9em; border: var(--rule-bar) solid currentColor; border-radius: var(--radius-card); font-weight: 900; }
+.options.live .option:not(:disabled) { border-color: var(--color-ink); }
+.options.live .option:hover:not(:disabled) { background: var(--color-accent); color: var(--color-accent-ink); border-color: var(--color-accent); transition: background-color var(--dur-micro) steps(1); }
+.options.live .option:active:not(:disabled) { translate: 2px 2px; }
+.option:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.option:disabled { cursor: default; }
+.option.picked { box-shadow: var(--shadow-press); }
+.option.correct { background: var(--ok); border-color: var(--ok); color: var(--color-accent-ink); }
+.option.wrong { border-color: var(--bad); color: var(--bad); }
+.option.wrong > span:last-child { text-decoration: line-through var(--rule-bar); }
+.option.dim { opacity: .38; }
+
+/* Code snippets in code questions. */
+.code { margin: var(--space-xs) 0 0; padding: var(--space-sm) var(--space-md); max-width: 100%; overflow: auto; background: var(--color-paper); color: var(--color-ink); border: var(--rule-bar) solid var(--color-octo); border-radius: var(--radius-card); font-family: var(--font-code); font-size: var(--text-md); line-height: 1.45; white-space: pre; tab-size: 4; text-align: left; }
+
+/* Countdown: Silkscreen seconds over a segmented bar. JS sets --frac (0..1). */
+.ring { position: relative; flex: none; display: grid; place-items: center; width: 96px; height: 96px; padding-bottom: var(--space-sm); border: var(--rule-bar) solid var(--color-ink); border-radius: var(--radius-card); background: var(--color-paper); --tick: var(--color-accent-2); }
+.ring span { font-family: var(--font-outlier); font-weight: 700; font-size: 44px; line-height: 1; color: var(--tick); font-variant-numeric: tabular-nums; }
+.ring::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 6px; height: 8px; background: repeating-linear-gradient(to right, var(--tick) 0 6px, transparent 6px 9px); clip-path: inset(0 calc((1 - var(--frac, 1)) * 100%) 0 0); }
+.ring.low { --tick: var(--bad); }
+
+/* Presence: a square lamp plus the word, never colour alone. */
+.dot { display: inline-block; width: 10px; height: 10px; background: var(--bad); vertical-align: middle; }
+.dot.on { background: var(--ok); }
+
+.conn-banner { position: fixed; top: 0; left: 0; right: 0; padding: var(--space-xs); text-align: center; background: var(--bad); color: var(--color-accent-ink); font-weight: 700; transform: translateY(-100%); transition: transform var(--dur-short) var(--ease-out); z-index: var(--z-toast); }
+.conn-banner.show { transform: none; }
+
+/* Small utility buttons (sound, fullscreen). */
+.icon-btn { position: fixed; bottom: var(--space-sm); right: var(--space-sm); z-index: var(--z-raised); padding: var(--space-2xs) var(--space-sm); font-size: var(--text-sm); box-shadow: 3px 3px 0 var(--color-accent-2); }
+.icon-btn.inline { position: static; flex: none; }
+
+.toast { position: fixed; left: 50%; bottom: var(--space-lg); transform: translateX(-50%); z-index: var(--z-toast); background: var(--color-paper-3); color: var(--color-ink); border: var(--rule-bar) solid var(--color-ink); border-radius: var(--radius-card); box-shadow: var(--shadow-press); padding: var(--space-xs) var(--space-md); font-weight: 700; opacity: 0; transition: opacity var(--dur-short) var(--ease-out); pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* The screen: static RGB grille and scanline, on wells and bands only. */
+.crt { position: relative; isolation: isolate; }
+.crt::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+  background-image:
+    repeating-linear-gradient(to right, color-mix(in oklab, var(--color-crt-r) 5%, transparent) 0 1px, color-mix(in oklab, var(--color-crt-g) 5%, transparent) 1px 2px, color-mix(in oklab, var(--color-crt-b) 5%, transparent) 2px 3px),
+    repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in oklab, var(--color-shade) 16%, transparent) 2px 3px); }
+
+/* Octo, the club sprite, always purple. Two frames swap on steps(1). */
+.octo { color: var(--color-octo); display: block; width: 100%; height: auto; shape-rendering: crispEdges; }
+.octo .hi { fill: color-mix(in oklab, currentColor 45%, var(--color-ink)); }
+.octo .eye { fill: var(--color-ink); }
+.octo .pupil { fill: var(--color-paper); }
+.octo .crown { fill: var(--color-ink); }
+.octo .f2 { visibility: hidden; }
+.octo.wiggle .f1 { animation: octo-a 900ms steps(1) infinite; }
+.octo.wiggle .f2 { animation: octo-b 900ms steps(1) infinite; }
+.octo.bob { animation: octo-bob 1800ms steps(1) infinite; }
+@keyframes octo-a { 50% { visibility: hidden; } }
+@keyframes octo-b { 50% { visibility: visible; } }
+@keyframes octo-bob { 50% { transform: translateY(-3%); } }
+@media (prefers-reduced-motion: reduce) {
+  .octo.wiggle .f1, .octo.wiggle .f2, .octo.bob { animation: none; }
+  .btn, .option, .toast, .conn-banner { transition: none; }
+}

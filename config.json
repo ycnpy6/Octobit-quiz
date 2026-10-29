@@ -1,0 +1,15 @@
+{
+  "port": 3006,
+  "questionsPerMatch": 15,
+  "buzzWindowSec": 15,
+  "answerSec": 10,
+  "stealSec": 5,
+  "revealSec": 4,
+  "points": { "correct": 10, "wrong": -5, "stealCorrect": 5, "stealWrong": 0 },
+  "allowSteal": true,
+  "lockoutOnWrong": true,
+  "suddenDeathQuestions": 1,
+  "falseStartSec": 1.5,
+  "hostFromLan": false,
+  "teamNames": { "A": "Team A", "B": "Team B" }
+}

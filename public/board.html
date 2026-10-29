@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Octobit Quiz board</title>
+<meta name="description" content="Projector scoreboard for the Octobit CS quiz.">
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/common.css">
+<style>
+/* Hallmark · shape: app screen · genre: playful · theme: Arcade (deal 1/3, seed quiz-buzzer-game-octobit-e5c8·9a339a3a·2026-10-28·r0) · redesign: full
+ * nav: kept (host header, board scoreline, team header) · signature: Octo, the Octobit pixel octopus, in each team's ink · states: lobby, live, locked, steal, reveal, paused, finished, reconnecting · arcade: ember/grille
+ * axes: dark/pixel/chromatic-ember · posture: full-palette · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: H, the host console stays a dense tool; it takes the system, not the stage */
+  /* Sized in vh so it scales from 720p to 1080p; question text is ~54px at 1080p. */
+/* Hallmark · waive 26b · this page adds no controls of its own · the press, hover, focus and disabled states live in common.css */
+  html, body { overflow: clip; }
+  body { height: 100vh; padding: 2.2vh 2.5vw; display: grid; grid-template-rows: auto 1fr auto auto; gap: 2.2vh; font-size: 2.6vh; }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 2vw; align-items: stretch; }
+  .team { --c: var(--team-A); position: relative; min-width: 0; display: flex; align-items: center; gap: 1.4vw; padding: 1.4vh 1.6vw; background: var(--color-paper-2); border: .3vh solid var(--color-rule); border-top: 1.2vh solid var(--c); border-radius: var(--radius-card); }
+  .team.B { --c: var(--team-B); flex-direction: row-reverse; text-align: right; }
+  .team .mascot { flex: none; width: 8vh; color: var(--c); }
+  .team .info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: .4vh; }
+  .team .slot { font-size: 2vh; font-weight: 700; color: var(--color-muted); }
+  .team .tname { font-size: 4vh; font-weight: 900; letter-spacing: -0.02em; line-height: 1.05; color: var(--c); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team .score { font-size: 10vh; color: var(--c); }
+  .team.ahead { border-color: var(--c); box-shadow: .8vh .8vh 0 var(--c); }
+  .team.active { background: var(--c); color: var(--color-accent-ink); }
+  .team.active .tname, .team.active .score, .team.active .mascot, .team.active .slot { color: var(--color-accent-ink); }
+  .delta { position: absolute; top: -2vh; right: 2vw; font-family: var(--font-outlier); font-weight: 700; font-size: 7vh; line-height: 1; pointer-events: none; animation: float 2s steps(8) forwards; }
+  .team.B .delta { right: auto; left: 2vw; }
+  .delta.pos { color: var(--ok); }
+  .delta.neg { color: var(--bad); }
+  @keyframes float { 0% { opacity: 0; transform: translateY(2vh); } 15% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-7vh); } }
+  .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1vh; min-width: 16vw; }
+  .badge { display: flex; flex-direction: column; align-items: center; padding: .6vh 1.4vw; border: .3vh solid var(--color-ink); border-radius: var(--radius-card); line-height: 1.1; }
+  .badge b { font-size: 2.8vh; font-weight: 900; }
+  .badge small { font-size: 1.8vh; font-weight: 700; color: var(--color-muted); }
+  .qnum { font-size: 3vh; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .ring { width: 13vh; height: 13vh; padding-bottom: 1.4vh; }
+  .ring span { font-size: 6vh; }
+  .ring::after { height: 1vh; bottom: .8vh; left: .8vh; right: .8vh; }
+  .question { display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+  .question .cat { color: var(--color-muted); font-size: 2.6vh; font-weight: 700; margin-bottom: 1vh; }
+  .question .text { font-size: 5.4vh; font-weight: 900; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; max-width: 52ch; }
+  .question.has-code { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: auto auto; align-content: center; column-gap: 3vw; }
+  .question.has-code .cat { grid-column: 1; align-self: end; }
+  .question.has-code .text { grid-column: 1; align-self: start; font-size: 4.4vh; }
+  .question .code { grid-column: 2; grid-row: 1 / 3; align-self: center; margin: 0; padding: 1.6vh 1.8vw; border-width: .3vh; font-size: min(3.2vh, calc(40vh / (var(--lines, 1) * 1.45))); max-height: 100%; }
+  body.has-code .board-options .option { min-height: 9vh; padding-block: 1.4vh; font-size: 3.2vh; }
+  .banner { display: flex; align-items: center; justify-content: center; gap: 1vw; min-height: 8.5vh; padding: 1.4vh; text-align: center; font-size: 4vh; font-weight: 900; letter-spacing: -0.01em; border: .3vh solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper-2); }
+  .banner.go { background: var(--ok); border-color: var(--ok); color: var(--color-accent-ink); }
+  .banner.alert { border-color: var(--bad); color: var(--bad); }
+  .banner.A { background: var(--team-A); border-color: var(--team-A); color: var(--color-accent-ink); }
+  .banner.B { background: var(--team-B); border-color: var(--team-B); color: var(--color-accent-ink); }
+  .board-options { gap: 1.8vh 1.5vw; }
+  .board-options .option { font-size: 3.6vh; padding: 2vh 1.5vw; min-height: 13vh; border-width: .3vh; }
+  .center { display: grid; place-items: center; text-align: center; grid-row: 2 / -1; }
+  .center > div { display: flex; flex-direction: column; align-items: center; gap: 3vh; }
+  .center .mascot { width: 26vh; color: var(--team-A); }
+  .lobby h1 { max-width: none; font-size: 13vh; text-wrap: balance; }
+  .lobby .vs { display: flex; align-items: baseline; gap: 2vw; font-size: 6vh; font-weight: 900; letter-spacing: -0.02em; }
+  .lobby .vs .A { color: var(--team-A); } .lobby .vs .B { color: var(--team-B); }
+  .lobby .vs .muted { font-size: 3.5vh; }
+  .lobby p { font-size: 3vh; font-weight: 700; }
+  .finished .mascot { width: 30vh; }
+  .finished h1 { max-width: 18ch; font-size: 10vh; text-wrap: balance; }
+  .finished .final { display: flex; align-items: center; gap: 3vw; font-size: 4vh; font-weight: 900; }
+  .finished .final .figure { font-size: 10vh; }
+  .overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; background: color-mix(in oklab, var(--color-paper) 90%, transparent); }
+  .overlay span { font-size: 16vh; }
+  .confetti { position: fixed; inset: 0; z-index: var(--z-raised); pointer-events: none; overflow: hidden; }
+  .confetti i { position: absolute; top: -3vh; width: 1.4vh; height: 1.4vh; animation: fall linear 2; }
+  .confetti .c0 { background: var(--team-A); } .confetti .c1 { background: var(--team-B); } .confetti .c2 { background: var(--color-ink); } .confetti .c3 { background: var(--color-crt-c); }
+  @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
+  #fs { right: calc(var(--space-sm) + 120px); }
+  body.playing .icon-btn { opacity: 0; transition: opacity var(--dur-short) var(--ease-out); }
+  body.playing .icon-btn:hover, body.playing .icon-btn:focus-visible { opacity: 1; }
+  /* Moments: one-shot and event-driven; transform and opacity only, stepped so they read as pixels. */
+  .team { transition: opacity var(--dur-short) var(--ease-out); }
+  .team.waiting { opacity: .45; }
+  .team .score { display: inline-block; }
+  .team.slam { animation: slam 480ms steps(8); }
+  .team.slam .mascot { animation: hop 480ms steps(4); }
+  .team.shake, .option.shake { animation: shake 420ms steps(6); }
+  .team.cheer .mascot { animation: hop 600ms steps(4) 2; }
+  .score.pop, .banner.pop, .ring.tick { animation: pop 420ms steps(4); }
+  .option.flash { animation: blink 780ms steps(1); }
+  .question.enter > * { animation: rise var(--dur-long) var(--ease-out) backwards; }
+  .options.deal .option { animation: rise var(--dur-long) var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 60ms + 120ms); }
+  @keyframes slam { 0% { transform: scale(1.07); } 25% { transform: translateX(-1vh) scale(1.03); } 50% { transform: translateX(1vh); } 75% { transform: translateX(-.5vh); } 100% { transform: none; } }
+  @keyframes hop { 0%, 100% { transform: none; } 40% { transform: translateY(-22%); } 70% { transform: translateY(-8%); } }
+  @keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-1.2vh); } 40% { transform: translateX(1.2vh); } 60% { transform: translateX(-.8vh); } 80% { transform: translateX(.8vh); } }
+  @keyframes pop { 0% { transform: scale(1.3); } 100% { transform: none; } }
+  @keyframes blink { 0%, 34%, 68% { opacity: 1; } 17%, 51%, 85% { opacity: .3; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(2vh); } }
+
+  /* The buzz splash: a team-coloured band slams across the screen with the name and Octo. */
+  .splash { position: fixed; inset: 0; z-index: var(--z-modal); display: none; place-items: center; pointer-events: none; background: color-mix(in oklab, var(--color-paper) 72%, transparent); }
+  .splash.show { display: grid; animation: splash-fade 1300ms var(--ease-out) forwards; }
+  .splash-band { --c: var(--team-A); width: 100%; display: flex; align-items: center; justify-content: center; gap: 3vw; padding: 4vh 4vw; background: var(--c); color: var(--color-accent-ink); border-block: .8vh solid var(--color-ink); }
+  .splash.B .splash-band { --c: var(--team-B); }
+  .splash-octo { flex: none; width: 18vh; }
+  .splash-text { min-width: 0; max-width: 64vw; font-size: 10vh; text-shadow: none; overflow-wrap: break-word; text-wrap: balance; }
+  .splash.show .splash-band { animation: band 1300ms forwards; }
+  .splash.show .splash-text { animation: slide 1300ms forwards; }
+  .splash.show .splash-octo { animation: hop 520ms steps(4) 2 200ms; }
+  @keyframes splash-fade { 0% { opacity: 0; } 8%, 82% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes band { 0% { transform: scaleY(0); animation-timing-function: steps(4, end); } 14%, 84% { transform: none; animation-timing-function: steps(3, end); } 100% { transform: scaleY(0); } }
+  @keyframes slide { 0% { transform: translateX(-30vw); animation-timing-function: steps(5, end); } 20%, 100% { transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .confetti { display: none; } .delta { animation: none; opacity: 0; }
+    .splash.show, .splash.show * { animation: none !important; opacity: 1; transform: none; } /* still shows, without moving */
+  }
+</style>
+</head>
+<body>
+  <div class="top" id="top">
+    <div class="team A crt" id="teamA"><span class="mascot"></span><div class="info"><span class="slot">Team A</span><span class="tname"></span></div><span class="score figure"></span></div>
+    <div class="mid">
+      <span class="badge" id="level"></span>
+      <span class="qnum" id="qnum"></span>
+      <div class="ring hidden" id="ring" role="timer"><span></span></div>
+    </div>
+    <div class="team B crt" id="teamB"><span class="mascot"></span><div class="info"><span class="slot">Team B</span><span class="tname"></span></div><span class="score figure"></span></div>
+  </div>
+  <section class="question" id="question"><div class="cat" id="cat"></div><div class="text" id="qtext"></div><pre class="code hidden" id="code"></pre></section>
+  <div class="banner" id="banner"></div>
+  <div class="options board-options" id="options"></div>
+  <div class="center hidden" id="screen"></div>
+  <div class="splash" id="splash" aria-hidden="true"><div class="splash-band"><span class="splash-octo"></span><span class="display splash-text"></span></div></div>
+  <div class="overlay hidden" id="paused"><span class="display">Paused</span></div>
+  <div class="confetti hidden" id="confetti"></div>
+  <button class="btn icon-btn" id="fs">Fullscreen</button>
+  <script src="/common.js"></script>
+  <script src="/board.js"></script>
+</body>
+</html>

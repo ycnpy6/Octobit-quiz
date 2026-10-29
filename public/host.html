@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Octobit Quiz host</title>
+<meta name="description" content="Host console for running an Octobit CS quiz match.">
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/common.css">
+<style>
+/* Hallmark · shape: app screen · genre: playful · theme: Arcade (deal 1/3, seed quiz-buzzer-game-octobit-e5c8·9a339a3a·2026-10-28·r0) · redesign: full
+ * nav: kept (host header, board scoreline, team header) · signature: Octo, the Octobit pixel octopus, in each team's ink · states: lobby, live, locked, steal, reveal, paused, finished, reconnecting · arcade: ember/grille
+ * axes: dark/pixel/chromatic-ember · posture: full-palette · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: H, the host console stays a dense tool; it takes the system, not the stage */
+/* Hallmark · waive 26b · this page adds no controls of its own · the press, hover, focus and disabled states live in common.css */
+  html, body { overflow-x: clip; }
+  body { padding: var(--space-md); font-size: 15px; }
+  header { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-md); padding-bottom: var(--space-sm); border-bottom: var(--rule-bar) solid var(--color-rule); }
+  header .mascot { width: 40px; color: var(--team-A); }
+  header h1 { max-width: none; font-size: 22px; margin-right: var(--space-xs); text-wrap: balance; }
+  .presence { display: flex; gap: var(--space-md); font-weight: 700; }
+  .phase { padding: var(--space-2xs) var(--space-sm); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); font-weight: 900; font-variant-numeric: tabular-nums; }
+  .phase.BUZZ_OPEN, .phase.LOCKED, .phase.STEAL { background: var(--ok); border-color: var(--ok); color: var(--color-accent-ink); }
+  .phase.PAUSED { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+  .ring { width: 60px; height: 60px; padding-bottom: 8px; }
+  .ring span { font-size: 26px; }
+  .ring::after { height: 5px; bottom: 4px; left: 4px; right: 4px; }
+  .restored { margin-bottom: var(--space-md); padding: var(--space-sm) var(--space-md); background: var(--color-accent); color: var(--color-accent-ink); border-radius: var(--radius-card); font-weight: 700; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--space-md); align-items: start; max-width: var(--container); margin-inline: auto; }
+  @media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .card { margin-bottom: var(--space-md); padding: var(--space-md); background: var(--color-paper-2); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); }
+  .card h2 { max-width: none; margin: 0 0 var(--space-sm); font-family: var(--font-body); font-size: var(--text-lg); font-weight: 900; letter-spacing: -0.02em; }
+  .row { display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center; }
+  input, select { min-height: 44px; color: var(--color-ink); background: var(--color-paper); border: var(--rule-bar) solid var(--color-muted); border-radius: 0; padding: var(--space-xs) var(--space-sm); }
+  input:hover, select:hover { border-color: var(--color-ink); }
+  input:focus-visible, select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-color: var(--color-ink); }
+  input:disabled, select:disabled { background: var(--color-paper-2); color: var(--color-muted); border-color: var(--color-rule); cursor: not-allowed; }
+  input[type=text] { min-width: 0; flex: 1; }
+  label { display: flex; flex-direction: column; gap: var(--space-2xs); flex: 1; min-width: 150px; font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); }
+  .hide-answer { margin-top: var(--space-sm); }
+  .links-note { margin: 0 0 var(--space-sm); font-size: var(--text-sm); color: var(--color-muted); }
+  #newKeys { margin-top: var(--space-xs); }
+  .domains { margin: var(--space-md) 0 0; padding: var(--space-sm) var(--space-md) var(--space-md); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); }
+  .domains legend { padding: 0 var(--space-xs); font-weight: 900; }
+  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-2xs) var(--space-md); }
+  label.check { flex-direction: row; align-items: center; gap: var(--space-xs); min-width: 0; min-height: 36px; font-size: 15px; color: var(--color-ink); cursor: pointer; }
+  label.check input { flex: none; width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--color-accent); cursor: pointer; }
+  label.check input:disabled { cursor: not-allowed; }
+  label.check .dn { flex: 1; min-width: 0; }
+  label.check .n { color: var(--color-muted); font-variant-numeric: tabular-nums; }
+  label.check.empty { color: var(--color-muted); }
+  .domain-foot { margin-top: var(--space-sm); }
+  .btn.small { padding: var(--space-2xs) var(--space-sm); font-size: var(--text-sm); box-shadow: 2px 2px 0 var(--color-accent-2); }
+  .domain-sum { font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); }
+  .domain-sum.warn { color: var(--color-accent); }
+  .qmeta { color: var(--color-muted); font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-2xs); }
+  .qtext { margin-bottom: var(--space-sm); font-size: 22px; font-weight: 900; letter-spacing: -0.01em; line-height: 1.2; text-wrap: balance; }
+  #qcard .code { margin: 0 0 var(--space-sm); font-size: 14px; }
+  .options .option { padding: var(--space-xs) var(--space-sm); font-size: 16px; cursor: default; }
+  .qstatus { margin-top: var(--space-sm); font-weight: 700; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-sm); }
+  .controls .btn { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); padding: var(--space-sm); }
+  kbd { padding: 0 var(--space-2xs); border: var(--rule-hair) solid currentColor; border-radius: 2px; font: 700 12px var(--font-body); opacity: .8; }
+  .score-row { display: flex; align-items: center; gap: var(--space-xs); margin-bottom: var(--space-sm); }
+  .score-row .n { flex: 1; min-width: 0; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .score-row .s { min-width: 64px; text-align: right; font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .score-row .btn { padding: var(--space-2xs) var(--space-xs); box-shadow: 2px 2px 0 var(--color-accent-2); }
+  .A .n, .A .s { color: var(--team-A); } .B .n, .B .s { color: var(--team-B); }
+  .url { display: flex; gap: var(--space-xs); align-items: center; margin-bottom: var(--space-xs); }
+  .url span { width: 60px; font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); }
+  .url input { flex: 1; min-height: 36px; font-size: 13px; }
+  .url .btn { padding: var(--space-2xs) var(--space-sm); box-shadow: 2px 2px 0 var(--color-accent-2); }
+  hr { border: 0; border-top: var(--rule-hair) solid var(--color-rule); }
+  .log { max-height: 340px; overflow: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .log div { padding: var(--space-2xs) 0; border-bottom: var(--rule-hair) solid var(--color-rule); }
+  .log .t { margin-right: var(--space-xs); color: var(--color-muted); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="mascot" id="mascot"></div>
+    <h1 class="display">Octobit host</h1>
+    <div class="presence" id="presence"></div>
+    <span class="phase" id="phase">…</span>
+    <div class="ring hidden" id="ring" role="timer"><span></span></div>
+  </header>
+  <div class="restored hidden" id="restored">Match restored after a server restart. Check the scores, then press Resume.</div>
+  <div class="layout">
+    <main>
+      <section class="card" id="setup">
+        <h2>Match setup</h2>
+        <div class="row">
+          <label>Level<select id="level"></select></label>
+          <label>Team A name<input type="text" id="nameA" maxlength="30"></label>
+          <label>Team B name<input type="text" id="nameB" maxlength="30"></label>
+        </div>
+        <fieldset class="domains">
+          <legend>Domains in this match</legend>
+          <div class="domain-grid" id="domainList"></div>
+          <div class="row domain-foot">
+            <button class="btn small" id="allDomains" type="button">Tick all</button>
+            <button class="btn small" id="noDomains" type="button">Clear</button>
+            <span class="domain-sum" id="domainSum"></span>
+          </div>
+        </fieldset>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="start">Start match</button>
+          <button class="btn" id="saveNames">Save names</button>
+        </div>
+      </section>
+      <section class="card" id="qcard">
+        <h2>Current question</h2>
+        <div class="qmeta" id="qmeta"></div>
+        <div class="qtext" id="qtext">No question yet.</div>
+        <pre class="code hidden" id="code"></pre>
+        <div class="options" id="options"></div>
+        <div class="qstatus" id="qstatus"></div>
+        <label class="check hide-answer"><input type="checkbox" id="hideAnswer"><span class="dn">Hide the answer on this screen until the reveal</span></label>
+      </section>
+      <section class="card">
+        <h2>Controls</h2>
+        <div class="controls">
+          <button class="btn primary" data-cmd="open_buzz">Open buzz<kbd>Space</kbd></button>
+          <button class="btn primary" data-cmd="next_question">Next<kbd>N</kbd></button>
+          <button class="btn ok" data-cmd="override" data-result="correct">Correct<kbd>C</kbd></button>
+          <button class="btn bad" data-cmd="override" data-result="wrong">Wrong<kbd>W</kbd></button>
+          <button class="btn" data-cmd="skip">Skip</button>
+          <button class="btn" id="pause">Pause<kbd>P</kbd></button>
+          <button class="btn" data-cmd="undo_last">Undo last<kbd>U</kbd></button>
+          <button class="btn bad" id="reset">Reset…</button>
+        </div>
+      </section>
+    </main>
+    <aside>
+      <section class="card">
+        <h2>Scores</h2>
+        <div id="scores"></div>
+      </section>
+      <section class="card">
+        <h2>Device links</h2>
+        <p class="links-note">Each link holds that screen’s secret key. Open it once on its device; keep links away from players.</p>
+        <div id="urls"></div>
+        <button class="btn small" id="newKeys" type="button">New device links</button>
+      </section>
+      <section class="card">
+        <h2>Event log</h2>
+        <div class="log" id="log"></div>
+      </section>
+    </aside>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="/common.js"></script>
+  <script src="/host.js"></script>
+</body>
+</html>
