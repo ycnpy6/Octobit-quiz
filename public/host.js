@@ -129,13 +129,15 @@ function render() {
     ${[-5, -1, 1, 5].map((d) => `<button class="btn" data-team="${t}" data-delta="${d}" ${lobby ? 'disabled' : ''}>${d > 0 ? '+' : ''}${d}</button>`).join('')}
     <span class="s">${s.teams[t].score}</span></div>`).join('');
 
-  // Device links carry each screen's key; only this console ever sees the keys.
+  // Plain links for each screen, and the join code each screen asks for once. Only this console sees the codes.
   const urls = s.urls || [], k = s.keys || {};
   const linksKey = urls.join() + JSON.stringify(k);
   if (linksKey !== urlsKey) {
     urlsKey = linksKey;
-    $('#urls').innerHTML = urls.map((base) => [['Board', '/board', 'board'], ['Team A', '/team/A', 'team:A'], ['Team B', '/team/B', 'team:B']]
-      .map(([label, path, role]) => `<div class="url"><span>${label}</span><input readonly value="${esc(`${base}${path}?k=${k[role] || ''}`)}"><button class="btn copy">Copy</button></div>`).join('')).join('<hr>');
+    const screens = [['Board', '/board', 'board'], ['Team A', '/team/A', 'team:A'], ['Team B', '/team/B', 'team:B']];
+    $('#codes').innerHTML = screens.map(([label, , role]) => `<div class="code-row"><span>${label}</span><b>${esc(k[role] || '')}</b></div>`).join('');
+    $('#urls').innerHTML = urls.map((base) => screens
+      .map(([label, path]) => `<div class="url"><span>${label}</span><input readonly value="${esc(base + path)}"><button class="btn copy">Copy</button></div>`).join('')).join('<hr>');
   }
 
   $('#log').innerHTML = (s.log || []).slice(-20).reverse().map((e) => {
@@ -173,7 +175,7 @@ $('#pause').addEventListener('click', togglePause);
 $('#hideAnswer').checked = hideAnswer;
 $('#hideAnswer').addEventListener('change', (e) => { hideAnswer = e.target.checked; Quiz.store.set('quiz-hide-answer', hideAnswer ? '1' : '0'); if (snap) render(); });
 $('#newKeys').addEventListener('click', () => {
-  if (confirm('Make new device links? The board and team screens on the old links are disconnected until you open the new ones.')) send('new_keys');
+  if (confirm('Make new join codes? The board and team screens are disconnected until each one enters its new code.')) send('new_keys');
 });
 $('#reset').addEventListener('click', () => { if (confirm('Reset the match? Scores and progress will be lost.')) send('reset'); });
 document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () =>

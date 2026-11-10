@@ -160,32 +160,34 @@ const MAX_SOCKETS = 40, MAX_PER_IP = 6; // a quiz needs 4 screens; this stops on
 const HELLO_TIMEOUT_MS = 5000; // sockets that never identify themselves are dropped
 const failures = new Map(); // ip -> { n, until }: wrong keys lock an address out for a minute after 5 tries
 
-// ---------- device keys ----------
-// Each role has a secret key. The host console hands out links with ?k=<key>; a device without the right key
-// cannot claim the board or a team. Connections from the server computer itself need no key.
-const token = () => crypto.randomBytes(12).toString('base64url');
+// ---------- join codes ----------
+// Each role has a 6-digit code, shown on the host console. A device opens the plain link (/board, /team/A, /team/B),
+// types its code once, and the browser remembers it. Without the right code a device cannot claim the board or a team;
+// five wrong codes lock that address out for a minute. Connections from the server computer itself need no code.
+const token = () => String(crypto.randomInt(0, 1e6)).padStart(6, '0');
 const newKeys = () => Object.fromEntries(ROLES.map((r) => [r, token()]));
 function saveKeys() { try { fs.writeFileSync(KEYS_FILE, JSON.stringify(keys)); } catch (e) { console.error('Could not save keys:', e.message); } }
 let keys;
 try { keys = JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')); } catch { /* first run */ }
-if (!keys || !ROLES.every((r) => typeof keys[r] === 'string')) { keys = newKeys(); saveKeys(); }
+if (!keys || !ROLES.every((r) => /^\d{6}$/.test(keys[r]))) { keys = newKeys(); saveKeys(); } // also replaces old long keys
 
 const isLocal = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
 function sameKey(a, b) {
   const x = Buffer.from(String(a || '')), y = Buffer.from(String(b));
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
-// Returns null when allowed, else the reason shown on the device.
+// Returns null when allowed, else { reason, message } for the device. Reasons: host_only, locked, need_code, wrong_code.
 function refuse(ws, role, key) {
-  if (role === 'host' && !ws.local && !config.hostFromLan) return 'The host console only opens on the server computer.';
+  if (role === 'host' && !ws.local && !config.hostFromLan) return { reason: 'host_only', message: 'The host console only opens on the server computer.' };
   if (ws.local) return null;
   const now = Date.now(), f = failures.get(ws.ip) || { n: 0, until: 0 };
-  if (f.until > now) return 'Too many wrong links from this device. Wait a minute, then use the link from the host.';
+  if (f.until > now) return { reason: 'locked', message: 'Too many wrong codes from this device. Wait a minute, then try again.' };
+  if (!key) return { reason: 'need_code', message: 'Enter the code for this screen. The host has it.' };
   if (sameKey(key, keys[role])) { failures.delete(ws.ip); return null; }
   f.n = f.until ? 1 : f.n + 1; // a lockout that has run out starts the count again
   f.until = f.n >= 5 ? now + 60000 : 0;
   failures.set(ws.ip, f);
-  return 'This screen needs its link from the host console. Ask the host.';
+  return { reason: 'wrong_code', message: 'That code is not right. Check it on the host console.' };
 }
 
 function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
@@ -232,8 +234,8 @@ wss.on('connection', (ws, req) => {
       if (!ROLES.includes(msg.role)) { send(ws, { type: 'error', message: 'Unknown role' }); return; }
       const why = refuse(ws, msg.role, msg.key);
       if (why) {
-        console.warn(`Refused ${msg.role} from ${req.socket.remoteAddress}`);
-        send(ws, { type: 'auth_failed', message: why });
+        if (why.reason !== 'need_code') console.warn(`Refused ${msg.role} from ${req.socket.remoteAddress} (${why.reason})`);
+        send(ws, { type: 'auth_failed', ...why });
         ws.close(4001, 'refused');
         return;
       }
@@ -282,7 +284,7 @@ function handle(ws, msg) {
     saveKeys();
     for (const [r, w] of clients) {
       if (r === 'host' || w.local) continue;
-      send(w, { type: 'auth_failed', message: 'Device links were renewed. Ask the host for the new link.' });
+      send(w, { type: 'auth_failed', reason: 'need_code', message: 'The codes were renewed. Enter the new code from the host.' });
       w.close(4001, 'keys renewed');
     }
     sendState('host');
@@ -314,9 +316,10 @@ server.listen(PORT, () => {
   console.log(`  Host (this computer only): ${SCHEME}://localhost:${PORT}/host\n`);
   for (const ip of lanAddresses()) {
     const base = `${SCHEME}://${ip}:${PORT}`;
-    console.log(`  Board:  ${base}/board?k=${keys.board}\n  Team A: ${base}/team/A?k=${keys['team:A']}\n  Team B: ${base}/team/B?k=${keys['team:B']}`);
-    if (config.hostFromLan) console.log(`  Host:   ${base}/host?k=${keys.host}`);
+    console.log(`  Board:  ${base}/board\n  Team A: ${base}/team/A\n  Team B: ${base}/team/B`);
+    if (config.hostFromLan) console.log(`  Host:   ${base}/host`);
     console.log('');
   }
-  console.log('  The same links, with copy buttons, are on the host console.');
+  console.log(`  Join codes: Board ${keys.board}, Team A ${keys['team:A']}, Team B ${keys['team:B']}${config.hostFromLan ? `, Host ${keys.host}` : ''}`);
+  console.log('  Each screen asks for its code once. The codes are also on the host console.');
 });

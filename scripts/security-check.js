@@ -55,21 +55,22 @@ const get = (port, p, method = 'GET') => new Promise((r) => {
   let r = await hello(remote, 'host');
   check(!!r.refused && !r.state, 'a LAN device cannot open the host console');
   r = await hello(remote, 'team:B');
-  check(!!r.refused && !r.state, 'a team screen without its key is refused');
+  check(!!r.refused && !r.state, 'a team screen without its code is refused');
   r = await hello(remote, 'team:B', srv.keys['team:A']);
-  check(!!r.refused, "team A's key does not unlock team B");
+  check(!!r.refused, "team A's code does not unlock team B");
   r = await hello(remote, 'board', 'guess');
-  check(!!r.refused, 'a guessed board key is refused');
+  check(!!r.refused, 'a guessed board code is refused');
   r = await hello(remote, 'team:B', srv.keys['team:B'], { Origin: 'http://evil.example' });
   check(r.closedCode === 4003 && !r.state, 'a socket from another origin is closed');
 
   const teamA = await hello(remote, 'team:A', srv.keys['team:A']);
-  check(!!teamA.state, 'team A with its own key gets in');
-  check(!JSON.stringify(teamA.msgs).includes(srv.keys.board), 'team snapshots never carry device keys');
+  check(!!teamA.state, 'team A with its own code gets in');
+  check(!JSON.stringify(teamA.msgs).includes(srv.keys.board), 'team snapshots never carry join codes');
 
   // A host on the server computer starts a match; team A tries to read the answer and false-start.
   const host = await hello(local, 'host');
-  check(!!host.state && host.state.keys && host.state.keys.board === srv.keys.board, 'the local host console sees the device keys');
+  check(!!host.state && host.state.keys && host.state.keys.board === srv.keys.board, 'the local host console sees the join codes');
+  check(Object.values(srv.keys).every((k) => /^\d{6}$/.test(k)), 'join codes are 6 digits');
   host.ws.send(JSON.stringify({ type: 'start_match', level: 'novice' }));
   await sleep(300);
   const q = teamA.state.current;
@@ -103,16 +104,16 @@ const get = (port, p, method = 'GET') => new Promise((r) => {
   const page = await get(srv.port, '/board');
   check(/frame-ancestors 'none'/.test(page.headers['content-security-policy'] || '') && page.headers['referrer-policy'] === 'no-referrer', 'pages send CSP and no-referrer');
 
-  // Renewing links disconnects screens on the old link.
+  // Renewing codes disconnects screens on the old ones.
   const victim = await hello(remote, 'team:A', srv.keys['team:A']);
   host.ws.send(JSON.stringify({ type: 'new_keys' }));
   await sleep(300);
-  check(victim.msgs.some((m) => m.type === 'auth_failed' && /renewed/.test(m.message)), 'new device links disconnect the old ones');
+  check(victim.msgs.some((m) => m.type === 'auth_failed' && /renewed/.test(m.message)), 'new join codes disconnect screens on the old ones');
 
-  // Brute force: five wrong keys lock the address out, even for the right key, for a minute.
+  // Brute force: five wrong codes lock the address out, even for the right key, for a minute.
   for (let i = 0; i < 5; i++) await hello(remote, 'board', `wrong-${i}`);
   r = await hello(remote, 'board', srv.keys.board);
-  check(!!r.refused && /Too many/.test(r.refused), 'repeated wrong keys lock the device out');
+  check(!!r.refused && /Too many/.test(r.refused), 'repeated wrong codes lock the device out');
 
   for (const s of [teamA, host, victim]) s.ws.close();
   srv.stop();

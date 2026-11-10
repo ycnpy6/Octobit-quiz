@@ -6,14 +6,16 @@ The Octobit club's CS quiz buzzer, hosted by Octo the pixel octopus. A quiz buzz
 
 1. Install **Node.js 18+**.
 2. In this folder, run `npm install` once. This needs internet. For an offline machine, copy the whole folder including `node_modules/`.
-3. Run `npm start`. The console prints the host link and one secret link per device:
+3. Run `npm start`. The console prints the links and a 6-digit join code for each screen:
    ```
    Host (this computer only): http://localhost:3000/host
-   Board:  http://192.168.1.20:3000/board?k=…
-   Team A: http://192.168.1.20:3000/team/A?k=…
-   Team B: http://192.168.1.20:3000/team/B?k=…
+   Board:  http://192.168.1.20:3000/board
+   Team A: http://192.168.1.20:3000/team/A
+   Team B: http://192.168.1.20:3000/team/B
+
+   Join codes: Board 456939, Team A 632408, Team B 730565
    ```
-4. Open the host console on the server computer. Open each device link once on its own device; the host console has the same links with copy buttons. The key is saved in that browser and removed from the address bar. On the projector, click **Fullscreen** (or press F11).
+4. Open the host console on the server computer; it shows the same links and codes. Open each link on its device and type that screen's code when it asks. The browser remembers it, so each device asks only once. On the projector, click **Fullscreen** (or press F11).
 5. On the host, check that the three presence dots are green. Then pick a level, set team names, tick the domains to play and click **Start match**.
 
 ## Running a match
@@ -86,13 +88,13 @@ Every match is shuffled: the question order, and the order of the four options. 
 
 The server decides everything; screens only show what it sends. On top of that:
 
-- **Host on the server computer only.** `/host` works only from the machine running `npm start`. A player who types the host address on their own computer is refused. (Set `"hostFromLan": true` to allow a host laptop; it then needs the host link with its key, printed in the console.)
-- **One secret key per screen.** Board, Team A and Team B each have a random key in their link. Without the right key, a device cannot open that screen. A team cannot take over the other team's buzzer or the projector, and Team A's key does not open Team B. After 5 wrong keys a device is locked out for a minute. The keys are kept in `keys.json` (not in git) so links survive a restart; **New device links** on the host makes fresh ones and disconnects the old links.
+- **Host on the server computer only.** `/host` works only from the machine running `npm start`. A player who types the host address on their own computer is refused. (Set `"hostFromLan": true` to allow a host laptop; it then asks for the host code, printed in the console.)
+- **A join code per screen.** The links are plain (`/board`, `/team/A`, `/team/B`), but each screen asks for its own random 6-digit code, shown only on the host console and in the server's console. Without the right code, a device cannot open that screen: a team cannot take over the other team's buzzer or the projector, and Team A's code does not open Team B. After 5 wrong codes a device is locked out for a minute, so guessing is hopeless. The codes are kept in `keys.json` (not in git) so they survive a restart; **New join codes** on the host makes fresh ones and sends every screen back to the code prompt.
 - **Answers stay on the host.** Team and board screens never receive the correct answer before the reveal, the question files are not served over HTTP, and the host's own traffic never crosses the network because it runs on localhost. If players can see the host's display, tick **Hide the answer on this screen until the reveal**.
 - **False starts.** A buzz sent before the buzzers open (an auto-clicker or a script) holds that team back for `falseStartSec` (1.5 s) once they open. The team page never sends early buzzes, so honest players are not affected.
 - **Flood limits.** More than 30 messages a second from one socket are dropped, and a socket that keeps flooding is cut off. Messages are capped at 4 KB, one device can hold 6 sockets at most, and sockets that never say who they are are closed after 5 seconds.
 - **Locked-down pages.** Every response sends a strict Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff` and `Referrer-Policy: no-referrer`. Only GET and HEAD are accepted, and sockets from another origin are closed.
-- `npm run security-check` starts a private server and attacks it the way a player could (wrong keys, host from the LAN, floods, false starts, file access). All 20 checks should pass.
+- `npm run security-check` starts a private server and attacks it the way a player could (wrong codes, host from the LAN, floods, false starts, file access). All 21 checks should pass.
 
 ### Network checklist for the event
 
@@ -104,7 +106,7 @@ The server decides everything; screens only show what it sends. On top of that:
    ```
    Set the router's network to **Private** in Windows, and leave client or AP isolation off.
 4. **Use the event computers, not players' own machines,** for the team screens, and keep the host computer and its console out of players' reach.
-5. **Optional: HTTPS.** Without it, someone on the same Wi-Fi could read a team's link key off the network. Make a certificate once (Git Bash has openssl):
+5. **Optional: HTTPS.** Without it, someone on the same Wi-Fi could read a team's join code off the network. Make a certificate once (Git Bash has openssl):
    ```
    openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 -subj "/CN=octobit-quiz"
    ```
@@ -112,7 +114,8 @@ The server decides everything; screens only show what it sends. On top of that:
 
 ## Troubleshooting
 
-- **A screen says "This screen needs its link from the host console".** It was opened without its key, or the links were renewed. Copy that device's link from the host console and open it on the device.
+- **A screen asks for a code.** Type that screen's 6-digit code from the host console. It asks again only after **New join codes**, or in a new browser.
+- **"Too many wrong codes from this device".** Wait a minute, then type the right code.
 - **A team screen says "False start!".** That team buzzed before the buzzers opened. It is held back for 1.5 s when they open.
 - **Other devices can't connect.** Allow Node through the firewall. On Windows, as admin: `netsh advfirewall firewall add rule name="Quiz" dir=in action=allow protocol=TCP localport=3000`. Also check that all devices are on the same network and that the router has no "client/AP isolation". A phone hotspot works as a fallback.
 - **"Port 3000 is already in use".** The quiz is probably already running. Stop it, or use another port: `$env:PORT=3001; npm start` (PowerShell) or `PORT=3001 npm start` (macOS/Linux).
@@ -149,7 +152,7 @@ The server decides everything; screens only show what it sends. On top of that:
 - On restart, timers freeze at the moment of the last save, so time while the server was down doesn't count.
 - Team pages hide the correct answer, the event log and the question queue until REVEAL. The board shows the correct letter in its banner on REVEAL.
 - The server pings each socket every 5 s and drops dead ones, so presence dots go red when a device disappears.
-- Anti-cheat additions beyond the spec: device keys in links (`keys.json`), host limited to the server computer (`hostFromLan`), a false-start penalty (`falseStartSec`), per-socket rate limits, security headers and optional TLS (`tls`). A false start is the one buzz outside BUZZ_OPEN that changes state: it adds the team to `current.falseStart`.
+- Anti-cheat additions beyond the spec: a 6-digit join code per screen (`keys.json`), host limited to the server computer (`hostFromLan`), a false-start penalty (`falseStartSec`), per-socket rate limits, security headers and optional TLS (`tls`). A false start is the one buzz outside BUZZ_OPEN that changes state: it adds the team to `current.falseStart`.
 - Extra host shortcuts beyond the spec: `P` (pause/resume) and `U` (undo).
 - The mute and fullscreen controls are text buttons ("Sound on", "Fullscreen"). On the board they fade out during a question and come back on hover.
 - Sounds are WAV rather than mp3/ogg, so they could be generated without extra tools.

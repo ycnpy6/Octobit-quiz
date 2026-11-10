@@ -40,6 +40,10 @@
   .hide-answer { margin-top: var(--space-sm); }
   .links-note { margin: 0 0 var(--space-sm); font-size: var(--text-sm); color: var(--color-muted); }
   #newKeys { margin-top: var(--space-xs); }
+  .codes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-xs); margin-bottom: var(--space-sm); }
+  .code-row { display: flex; flex-direction: column; padding: var(--space-xs); border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-card); background: var(--color-paper); }
+  .code-row span { font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); }
+  .code-row b { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: 0; }
   .domains { margin: var(--space-md) 0 0; padding: var(--space-sm) var(--space-md) var(--space-md); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); }
   .domains legend { padding: 0 var(--space-xs); font-weight: 900; }
   .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-2xs) var(--space-md); }
@@ -138,9 +142,10 @@
       </section>
       <section class="card">
         <h2>Device links</h2>
-        <p class="links-note">Each link holds that screen’s secret key. Open it once on its device; keep links away from players.</p>
+        <p class="links-note">Open the link on its device and type its code once. Keep the codes away from players.</p>
+        <div class="codes" id="codes"></div>
         <div id="urls"></div>
-        <button class="btn small" id="newKeys" type="button">New device links</button>
+        <button class="btn small" id="newKeys" type="button">New join codes</button>
       </section>
       <section class="card">
         <h2>Event log</h2>
