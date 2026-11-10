@@ -50,7 +50,7 @@ Restart the server after editing the config. Question files are re-read at every
 
 ## Questions
 
-Four levels, easiest first: **Novice** (167 questions), **Apprentice** (167), **Wizard** (167) and **Kraken**, the boss level (170). That is enough for 11 matches per level before any question repeats. Each is a file in `questions/` (`novice.json`, `apprentice.json`, `wizard.json`, `kraken.json`):
+Five levels, easiest first: **Hatchling**, for high school students (169 questions, the default), **Novice** (167), **Apprentice** (167), **Wizard** (167) and **Kraken**, the boss level (170). That is enough for 11 matches per level before any question repeats. Each is a file in `questions/` (`hatchling.json`, `novice.json`, `apprentice.json`, `wizard.json`, `kraken.json`):
 
 ```json
 { "id": "beg-001", "category": "Algorithms", "text": "…", "options": ["…", "…", "…", "…"], "correct": 0 }
@@ -130,7 +130,7 @@ The server decides everything; screens only show what it sends. On top of that:
 ## Decisions on ambiguous points
 
 - The app lives in this folder rather than a `quiz-app/` subfolder.
-- The spec's three levels were renamed and a fourth added: novice, apprentice, wizard and kraken. Display names live in `game.LEVEL_INFO` and go to clients with every `state` message (`levels`). A saved state with an old level name restores as novice.
+- The spec's three levels were renamed and two added: hatchling (high school), novice, apprentice, wizard and kraken. Display names live in `game.LEVEL_INFO` and go to clients with every `state` message (`levels`). A saved state with an old level name restores as novice.
 - Domain filtering happens in `server.js` before it builds the queue, so `game.js` is unchanged. `start_match` takes an optional `domains` list; leaving it out means every domain.
 - Randomness stays in `server.js`: it shuffles each question's options when it loads the files, and builds the queue with unplayed questions first (`history.json`).
 - `game.step(state, event, now, ctx)` takes `ctx = { config, bank }`. The server shuffles the queue and passes it in `start_match`, so `game.js` stays deterministic.

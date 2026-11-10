@@ -2,9 +2,10 @@
 // Pure quiz state machine: step(state, event, now, ctx) -> { state, effects }.
 // No timers, sockets or randomness. ctx = { config, bank: { [id]: question } }.
 
-const LEVELS = ['novice', 'apprentice', 'wizard', 'kraken'];
+const LEVELS = ['hatchling', 'novice', 'apprentice', 'wizard', 'kraken'];
 // Display names, easiest first. Sent to clients with every state message.
 const LEVEL_INFO = [
+  { key: 'hatchling', name: 'Hatchling', tagline: 'High school' },
   { key: 'novice', name: 'Novice', tagline: 'First dive' },
   { key: 'apprentice', name: 'Apprentice', tagline: 'Deeper water' },
   { key: 'wizard', name: 'Wizard', tagline: 'Arcane code' },
