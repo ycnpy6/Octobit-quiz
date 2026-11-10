@@ -14,7 +14,7 @@ const config = JSON.parse(fs.readFileSync(process.env.CONFIG || path.join(ROOT, 
 const PORT = Number(process.env.PORT) || config.port;
 const STATE_FILE = process.env.STATE_FILE || path.join(ROOT, 'state.json');
 const HISTORY_FILE = path.join(path.dirname(STATE_FILE), 'history.json');
-const KEYS_FILE = path.join(path.dirname(STATE_FILE), 'keys.json');
+const CLAIMS_FILE = path.join(path.dirname(STATE_FILE), 'claims.json');
 
 // ---------- state, questions, timers ----------
 let state = game.initialState(config);
@@ -120,7 +120,7 @@ const TLS = config.tls && config.tls.cert && config.tls.key
   ? { cert: fs.readFileSync(path.resolve(ROOT, config.tls.cert)), key: fs.readFileSync(path.resolve(ROOT, config.tls.key)) }
   : null;
 const SCHEME = TLS ? 'https' : 'http';
-// Locked down: same-origin scripts and sockets only, no framing, no referrer (links carry device keys).
+// Locked down: same-origin scripts and sockets only, no framing, no referrer.
 const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   'X-Content-Type-Options': 'nosniff',
@@ -158,44 +158,44 @@ const wss = new WebSocketServer({ server, maxPayload: 4096 });
 const RATE_LIMIT = 30; // messages per second per socket; far above any human, far below a buzz-flooding script
 const MAX_SOCKETS = 40, MAX_PER_IP = 6; // a quiz needs 4 screens; this stops one machine from exhausting the server
 const HELLO_TIMEOUT_MS = 5000; // sockets that never identify themselves are dropped
-const failures = new Map(); // ip -> { n, until }: wrong keys lock an address out for a minute after 5 tries
 
-// ---------- join codes ----------
-// Each role has a 6-digit code, shown on the host console. A device opens the plain link (/board, /team/A, /team/B),
-// types its code once, and the browser remembers it. Without the right code a device cannot claim the board or a team;
-// five wrong codes lock that address out for a minute. Connections from the server computer itself need no code.
-const token = () => String(crypto.randomInt(0, 1e6)).padStart(6, '0');
-const newKeys = () => Object.fromEntries(ROLES.map((r) => [r, token()]));
-function saveKeys() { try { fs.writeFileSync(KEYS_FILE, JSON.stringify(keys)); } catch (e) { console.error('Could not save keys:', e.message); } }
-let keys;
-try { keys = JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')); } catch { /* first run */ }
-if (!keys || !ROLES.every((r) => /^\d{6}$/.test(keys[r]))) { keys = newKeys(); saveKeys(); } // also replaces old long keys
-
+// ---------- screen claims ----------
+// No codes: each screen (board, team A, team B) locks to the first device that opens it. Every browser keeps a
+// random device id, so the same device gets back in after a refresh, a Wi-Fi drop or a server restart, while any
+// other device is refused. The host console shows who holds each screen and can release it.
+// Scripts on the server computer that send no device id (simulator, checks) are let through without claiming.
+let claims = {};
+try { claims = JSON.parse(fs.readFileSync(CLAIMS_FILE, 'utf8')) || {}; } catch { /* first run */ }
+function saveClaims() { try { fs.writeFileSync(CLAIMS_FILE, JSON.stringify(claims)); } catch (e) { console.error('Could not save claims:', e.message); } }
 const isLocal = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
-function sameKey(a, b) {
-  const x = Buffer.from(String(a || '')), y = Buffer.from(String(b));
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
-}
-// Returns null when allowed, else { reason, message } for the device. Reasons: host_only, locked, need_code, wrong_code.
-function refuse(ws, role, key) {
+const cleanIp = (ip) => String(ip || '').replace(/^::ffff:/, '');
+const validDevice = (d) => typeof d === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(d);
+
+// Returns null when allowed, else { reason, message } for the device.
+function refuse(ws, role, device) {
   if (role === 'host' && !ws.local && !config.hostFromLan) return { reason: 'host_only', message: 'The host console only opens on the server computer.' };
-  if (ws.local) return null;
-  const now = Date.now(), f = failures.get(ws.ip) || { n: 0, until: 0 };
-  if (f.until > now) return { reason: 'locked', message: 'Too many wrong codes from this device. Wait a minute, then try again.' };
-  if (!key) return { reason: 'need_code', message: 'Enter the code for this screen. The host has it.' };
-  if (sameKey(key, keys[role])) { failures.delete(ws.ip); return null; }
-  f.n = f.until ? 1 : f.n + 1; // a lockout that has run out starts the count again
-  f.until = f.n >= 5 ? now + 60000 : 0;
-  failures.set(ws.ip, f);
-  return { reason: 'wrong_code', message: 'That code is not right. Check it on the host console.' };
+  if (ws.local && !validDevice(device)) return null;
+  if (!validDevice(device)) return { reason: 'no_device', message: 'This browser blocks storage. Use a normal (not private) window.' };
+  const c = claims[role];
+  if (!c || c.device === device || ws.local) return null; // free, the same device, or the server computer taking it back
+  return { reason: 'in_use', message: 'This screen is already open on another device. Ask the host to release it.' };
 }
+function claim(ws, role, device) {
+  if (!validDevice(device) || (role === 'host' && ws.local)) return; // the host on the server computer needs no claim
+  const c = claims[role];
+  if (c && c.device === device && c.ip === cleanIp(ws.ip)) return;
+  claims[role] = { device, ip: cleanIp(ws.ip) };
+  saveClaims();
+}
+// Who holds each screen, by address only (device ids never leave the server).
+const claimView = () => Object.fromEntries(ROLES.map((r) => [r, claims[r] ? claims[r].ip : null]));
 
 function send(ws, msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function presence() { return { A: clients.has('team:A'), B: clients.has('team:B'), board: clients.has('board') }; }
 
 function viewFor(role) {
   const snap = game.viewFor(state, role);
-  if (role === 'host') Object.assign(snap, { presence: presence(), urls: lanAddresses().map((ip) => `${SCHEME}://${ip}:${PORT}`), keys,
+  if (role === 'host') Object.assign(snap, { presence: presence(), urls: lanAddresses().map((ip) => `${SCHEME}://${ip}:${PORT}`), claims: claimView(),
     domains: game.DOMAINS.map(({ key, name }) => ({ key, name })), counts, perMatch: config.questionsPerMatch });
   return snap;
 }
@@ -232,9 +232,9 @@ wss.on('connection', (ws, req) => {
     if (!msg || typeof msg.type !== 'string') return;
     if (msg.type === 'hello') {
       if (!ROLES.includes(msg.role)) { send(ws, { type: 'error', message: 'Unknown role' }); return; }
-      const why = refuse(ws, msg.role, msg.key);
+      const why = refuse(ws, msg.role, msg.device);
       if (why) {
-        if (why.reason !== 'need_code') console.warn(`Refused ${msg.role} from ${req.socket.remoteAddress} (${why.reason})`);
+        console.warn(`Refused ${msg.role} from ${cleanIp(ws.ip)} (${why.reason})`);
         send(ws, { type: 'auth_failed', ...why });
         ws.close(4001, 'refused');
         return;
@@ -242,6 +242,7 @@ wss.on('connection', (ws, req) => {
       const old = clients.get(msg.role);
       if (old && old !== ws) { old.role = null; send(old, { type: 'taken_over' }); old.close(4000, 'taken over'); }
       if (ws.role && ws.role !== msg.role) clients.delete(ws.role);
+      claim(ws, msg.role, msg.device);
       ws.role = msg.role;
       clearTimeout(ws.helloTimer);
       clients.set(msg.role, ws);
@@ -278,14 +279,14 @@ function handle(ws, msg) {
     const before = state;
     dispatch({ type: 'start_match', level: msg.level, names: msg.names, queue: pick.queue }, ws);
     if (state !== before) { history[msg.level] = pick.history; saveHistory(); }
-  } else if (role === 'host' && msg.type === 'new_keys') {
-    // New links for every device; remote devices on the old links are disconnected.
-    keys = newKeys();
-    saveKeys();
-    for (const [r, w] of clients) {
-      if (r === 'host' || w.local) continue;
-      send(w, { type: 'auth_failed', reason: 'need_code', message: 'The codes were renewed. Enter the new code from the host.' });
-      w.close(4001, 'keys renewed');
+  } else if (role === 'host' && msg.type === 'release' && ROLES.includes(msg.role) && msg.role !== 'host') {
+    // Free a screen so another device can open it; the device holding it now is disconnected.
+    delete claims[msg.role];
+    saveClaims();
+    const w = clients.get(msg.role);
+    if (w) {
+      send(w, { type: 'auth_failed', reason: 'released', message: 'The host released this screen. Reload to open it here again.' });
+      w.close(4001, 'released');
     }
     sendState('host');
   } else if (role === 'host' && HOST_EVENTS.includes(msg.type)) {
@@ -320,6 +321,5 @@ server.listen(PORT, () => {
     if (config.hostFromLan) console.log(`  Host:   ${base}/host`);
     console.log('');
   }
-  console.log(`  Join codes: Board ${keys.board}, Team A ${keys['team:A']}, Team B ${keys['team:B']}${config.hostFromLan ? `, Host ${keys.host}` : ''}`);
-  console.log('  Each screen asks for its code once. The codes are also on the host console.');
+  console.log('  Each screen locks to the first device that opens it. Release one from the host console to move it.');
 });

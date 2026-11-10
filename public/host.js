@@ -129,13 +129,16 @@ function render() {
     ${[-5, -1, 1, 5].map((d) => `<button class="btn" data-team="${t}" data-delta="${d}" ${lobby ? 'disabled' : ''}>${d > 0 ? '+' : ''}${d}</button>`).join('')}
     <span class="s">${s.teams[t].score}</span></div>`).join('');
 
-  // Plain links for each screen, and the join code each screen asks for once. Only this console sees the codes.
-  const urls = s.urls || [], k = s.keys || {};
-  const linksKey = urls.join() + JSON.stringify(k);
+  // Plain links for each screen, and which device (by address) holds each one.
+  const urls = s.urls || [], held = s.claims || {};
+  const linksKey = urls.join() + JSON.stringify(held) + JSON.stringify(p);
   if (linksKey !== urlsKey) {
     urlsKey = linksKey;
     const screens = [['Board', '/board', 'board'], ['Team A', '/team/A', 'team:A'], ['Team B', '/team/B', 'team:B']];
-    $('#codes').innerHTML = screens.map(([label, , role]) => `<div class="code-row"><span>${label}</span><b>${esc(k[role] || '')}</b></div>`).join('');
+    const online = { board: p.board, 'team:A': p.A, 'team:B': p.B };
+    $('#codes').innerHTML = screens.map(([label, , role]) => `<div class="code-row"><span>${label}</span><b>${held[role] ? esc(held[role]) : 'Free'}</b>
+      <small>${held[role] ? (online[role] ? 'Connected' : 'Away') : 'First device to open it'}</small>
+      <button class="btn small" data-release="${role}" ${held[role] ? '' : 'disabled'}>Release</button></div>`).join('');
     $('#urls').innerHTML = urls.map((base) => screens
       .map(([label, path]) => `<div class="url"><span>${label}</span><input readonly value="${esc(base + path)}"><button class="btn copy">Copy</button></div>`).join('')).join('<hr>');
   }
@@ -174,8 +177,9 @@ $('#saveNames').addEventListener('click', () => send('set_names', { A: $('#nameA
 $('#pause').addEventListener('click', togglePause);
 $('#hideAnswer').checked = hideAnswer;
 $('#hideAnswer').addEventListener('change', (e) => { hideAnswer = e.target.checked; Quiz.store.set('quiz-hide-answer', hideAnswer ? '1' : '0'); if (snap) render(); });
-$('#newKeys').addEventListener('click', () => {
-  if (confirm('Make new join codes? The board and team screens are disconnected until each one enters its new code.')) send('new_keys');
+$('#codes').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-release]');
+  if (b && confirm('Release this screen? The device holding it is disconnected, and the next device to open the link takes it.')) send('release', { role: b.dataset.release });
 });
 $('#reset').addEventListener('click', () => { if (confirm('Reset the match? Scores and progress will be lost.')) send('reset'); });
 document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () =>

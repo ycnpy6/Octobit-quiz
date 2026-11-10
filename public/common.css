@@ -59,18 +59,6 @@ button:disabled { cursor: default; }
 /* Code snippets in code questions. */
 .code { margin: var(--space-xs) 0 0; padding: var(--space-sm) var(--space-md); max-width: 100%; overflow: auto; background: var(--color-paper); color: var(--color-ink); border: var(--rule-bar) solid var(--color-octo); border-radius: var(--radius-card); font-family: var(--font-code); font-size: var(--text-md); line-height: 1.45; white-space: pre; tab-size: 4; text-align: left; }
 
-/* Join form: a full-screen card asking for this screen's code. */
-.join { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: var(--space-md); background: var(--color-paper); }
-.join-card { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); width: min(100%, 420px); padding: var(--space-xl) var(--space-lg); background: var(--color-paper-2); color: var(--color-ink); border: var(--rule-bar) solid var(--color-rule); border-radius: var(--radius-card); text-align: center; }
-.join-octo { width: 96px; }
-.join h1 { max-width: none; font-size: 48px; }
-.join-msg { color: var(--color-ink-2); }
-.join-label { font-size: var(--text-sm); font-weight: 700; color: var(--color-muted); }
-.join-input { width: 100%; min-height: 64px; padding: var(--space-xs) var(--space-sm); background: var(--color-paper); color: var(--color-ink); border: var(--rule-bar) solid var(--color-muted); border-radius: 0; font-family: var(--font-body); font-size: 36px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: 0; text-align: center; }
-.join-input:hover { border-color: var(--color-ink); }
-.join-input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-color: var(--color-ink); }
-.join-btn { width: 100%; padding-block: var(--space-sm); font-size: var(--text-lg); }
-
 /* Countdown: Silkscreen seconds over a segmented bar. JS sets --frac (0..1). */
 .ring { position: relative; flex: none; display: grid; place-items: center; width: 96px; height: 96px; padding-bottom: var(--space-sm); border: var(--rule-bar) solid var(--color-ink); border-radius: var(--radius-card); background: var(--color-paper); --tick: var(--color-accent-2); }
 .ring span { font-family: var(--font-outlier); font-weight: 700; font-size: 44px; line-height: 1; color: var(--tick); font-variant-numeric: tabular-nums; }
